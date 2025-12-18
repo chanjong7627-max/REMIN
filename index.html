@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reminal - Where Emotions Settle</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Preloading fonts if needed, using system fonts for now to match modern iOS feel -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Material Icons for prototype speed -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./assets/favicon.png" />
+    <link rel="apple-touch-icon" href="./assets/favicon.png" />
+
+</head>
+
+<body>
+    <div class="cloud-blur cloud-1"></div>
+    <div class="cloud-blur cloud-2"></div>
+
+    <div id="app">
+        <!-- Global Header -->
+        <div id="global-header" class="hidden">
+            <!-- Back Button -->
+            <button id="header-back-btn" onclick="handleBack()"
+                style="background:transparent; border:none; padding:10px; cursor:pointer; pointer-events:auto;">
+                <span class="material-icons-outlined">arrow_back</span>
+            </button>
+
+            <!-- Logo (Center absolute or just left aligned?) - adhering to previous flex structure but making clickable area safe -->
+
+            <!-- Right Icons -->
+            <div class="header-icons" style="pointer-events:auto; display:flex; gap:8px;">
+                <button id="btnNotif" aria-label="Notifications"
+                    style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <span class="material-icons-outlined" style="font-size:24px; color:#374151;">notifications</span>
+                </button>
+                <button id="btnSettings" aria-label="Settings"
+                    style="background:transparent; border:none; padding:8px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <span class="material-icons-outlined" style="font-size:24px; color:#374151;">settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Screens -->
+        <div id="screen-container">
+            <!-- 1. Splash Screen (Image Based) -->
+            <div id="screen-splash" class="screen active" onclick="navigateTo('login')"
+                style="padding:0 !important; background:black;">
+                <img src="./assets/app_start.png" alt="Splash"
+                    style="width:100%; height:100%; object-fit:cover; display:block;">
+            </div>
+
+            <!-- 2. Login Screen -->
+            <div id="screen-login" class="screen">
+                <div class="content-center" style="align-items: flex-start; text-align: left;">
+                    <h1 style="margin-bottom:10px">환영합니다</h1>
+                    <p style="margin-bottom:40px">리민과 함께 마음의 평화를 찾아보세요.</p>
+                </div>
+                <div class="bottom-action">
+                    <button class="btn-capsule" onclick="navigateTo('email-input')">이메일로 시작하기</button>
+                </div>
+            </div>
+
+            <!-- 3. Email Input Screen -->
+            <div id="screen-email-input" class="screen">
+                <div class="content-top">
+                    <h2 style="margin-bottom:10px">이메일을<br>입력해주세요</h2>
+                    <p style="margin-bottom:30px">안전한 로그인을 위해 이메일이 필요합니다.</p>
+
+                    <input type="email" class="input-field" id="email-field" placeholder="name@remin.com" readonly
+                        onclick="startEmailTyping()">
+                </div>
+                <div class="bottom-action">
+                    <button id="btn-email-next" class="btn-capsule disabled" style="margin-top: 20px;"
+                        onclick="navigateTo('welcome')">다음으로</button>
+                </div>
+            </div>
+
+            <!-- 4. Welcome + Direction -->
+            <div id="screen-welcome" class="screen">
+                <div class="content-center">
+                    <h2 style="text-align:center; margin-bottom:10px">반가워요!</h2>
+                    <p style="text-align:center">이제 감정의 여정을 시작해볼까요?</p>
+                </div>
+                <div class="bottom-action">
+                    <button class="btn-capsule" onclick="navigateTo('direction')">시작하기</button>
+                </div>
+            </div>
+
+            <!-- Direction Choice -->
+            <div id="screen-direction" class="screen">
+                <h2 style="text-align:center; margin-bottom:40px">어떤 도움이<br>필요하신가요?</h2>
+
+                <div class="card-white" onclick="selectDirection('reminer', this)" style="cursor:pointer">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+                        <h3>나의 감정을<br>관리하고 싶어요</h3>
+                        <span class="material-icons-outlined" style="color:var(--primary)">face</span>
+                    </div>
+                    <p>내면의 소리에 귀 기울이기</p>
+                </div>
+
+                <div class="card-white" onclick="selectDirection('helper', this)" style="cursor:pointer">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+                        <h3>누군가의 감정을<br>이해하고 싶어요</h3>
+                        <span class="material-icons-outlined" style="color:var(--primary)">favorite_border</span>
+                    </div>
+                    <p>타인을 위한 공감과 위로</p>
+                </div>
+            </div>
+
+            <!-- Main App Container -->
+            <div id="screen-main" class="screen" style="padding:0; background:#F9FAFB"> <!-- Full width for tabs -->
+                <div id="tab-content" class="scroll-content" style="padding: 20px 20px 100px 20px; padding-top:90px">
+                    <!-- Tab Content via JS -->
+                </div>
+                <div class="bottom-nav"></div>
+            </div>
+
+            <!-- Breathing Session Screen -->
+            <div id="screen-breathe-session" class="screen" style="background: white; z-index: 200;">
+                <div
+                    style="position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; align-items:center">
+                    <button onclick="navigateTo('main')"
+                        style="background:none; border:none; padding:10px; cursor:pointer"><span
+                            class="material-icons-outlined" style="color:#333">close</span></button>
+                    <span style="font-size:12px; font-weight:600; color:#999">4-7-8 BREATHING</span>
+                    <button style="background:none; border:none; padding:10px; cursor:pointer"><span
+                            class="material-icons-outlined" style="color:#333">settings</span></button>
+                </div>
+
+                <div class="breathing-container">
+                    <div class="chip" style="margin-bottom:20px; background:#EFF6FF; color:var(--primary)">이완 및 수면
+                        유도</div>
+                    <h2 id="breathe-instruction" style="margin-bottom:10px; font-size:28px">들이마시세요</h2>
+                    <p id="breathe-subtext">코를 통해 깊게 숨을 채우세요</p>
+
+                    <div class="timer-circle">
+                        <svg class="timer-svg" viewBox="0 0 300 300">
+                            <circle class="timer-circle-bg" cx="150" cy="150" r="140"></circle>
+                            <circle id="timer-progress" class="timer-circle-progress" cx="150" cy="150" r="140">
+                            </circle>
+                        </svg>
+                        <div class="timer-text">
+                            <h2 id="timer-number">4</h2>
+                            <p>SECONDS</p>
+                        </div>
+                    </div>
+
+                    <div class="session-controls">
+                        <button class="control-btn btn-stop" onclick="stopBreathing()"><span
+                                class="material-icons-outlined">stop</span></button>
+                        <button id="btn-play-pause" class="control-btn btn-play" onclick="toggleBreathing()"><span
+                                class="material-icons-outlined">pause</span></button>
+                    </div>
+                </div>
+            </div>
+            <!-- 5. Deepen Screen -->
+            <div id="screen-deepen" class="screen" style="background:white; z-index:150;">
+                <div class="content-top">
+                    <h2 class="section-title">감정 깊이보기</h2>
+                    <p class="section-desc">왜 그런 기분이 들었나요?</p>
+
+                    <div class="input-field"
+                        style="height:150px; display:flex; flex-direction:column; margin-bottom:20px;">
+                        <textarea id="deepen-input"
+                            style="flex:1; border:none; outline:none; font-size:16px; font-family:'Inter'; resize:none;"
+                            placeholder="자유롭게 적어주세요..."></textarea>
+                    </div>
+                </div>
+                <div class="bottom-action">
+                    <button class="btn-capsule" onclick="saveRecord()">저장하기</button>
+                </div>
+            </div>
+
+            <!-- 6. Advanced 3-Step Record Flow -->
+            <div id="screen-record-flow" class="screen" style="background:white; z-index:160;">
+                <div
+                    style="position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; align-items:center; z-index:10;">
+                    <span class="material-icons-outlined" onclick="closeRecordFlow()"
+                        style="padding:10px; color:#333; cursor:pointer">close</span>
+                    <span id="record-step-indicator" style="font-size:14px; font-weight:600; color:var(--primary)">Step
+                        1/3</span>
+                    <div style="width:44px"></div> <!-- Spacer -->
+                </div>
+
+                <div id="record-step-content" class="scroll-content" style="padding: 80px 20px 100px 20px;">
+                    <!-- Step Content via JS -->
+                </div>
+
+                <div class="bottom-nav"
+                    style="border-radius:0; height:auto; padding:20px; box-shadow:0 -5px 20px rgba(0,0,0,0.05);">
+                    <button id="btn-record-next" class="btn-capsule" onclick="nextRecordStep()">다음으로</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- OVERLAYS (Outside app container to ensure Z-index integrity) -->
+
+    <!-- 1. Notification Overlay -->
+    <div id="notificationOverlay" class="settings-overlay hidden" aria-hidden="true" style="z-index:9998;">
+        <!-- Overlay Background handled by CSS (.settings-overlay) -->
+        <div id="notificationSheet" class="settings-sheet">
+            <div class="settings-header">
+                <h3>알림</h3>
+                <button id="btnNotifClose" style="border:none; background:transparent; cursor:pointer; padding:8px;">
+                    <span class="material-icons-outlined">close</span>
+                </button>
+            </div>
+            <div class="settings-content" id="notif-list">
+                <!-- JS Filled -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Settings Overlay -->
+    <div id="settingsOverlay" class="settings-overlay hidden" aria-hidden="true" style="z-index:9999;">
+        <div id="settingsSheet" class="settings-sheet">
+            <div class="settings-header">
+                <h3>설정</h3>
+                <button id="btnSettingsClose" style="border:none; background:transparent; cursor:pointer; padding:8px;">
+                    <span class="material-icons-outlined">close</span>
+                </button>
+            </div>
+            <div class="settings-content">
+                <!-- Settings Content -->
+                <div class="setting-group">
+                    <p class="group-title">알림</p>
+                    <div class="setting-item">
+                        <div class="setting-label">오늘 감정 체크인</div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleCheckin">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">호흡 리마인드</div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggleBreath" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- App Mode -->
+                <div class="setting-group">
+                    <p class="group-title">앱 설정</p>
+                    <div class="setting-item">
+                        <div class="setting-label">모드 전환</div>
+                        <div class="segment-control" id="segMode">
+                            <span data-val="reminer" class="segment active">Reminer</span>
+                            <span data-val="helper" class="segment">Helper</span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-label">언어</div>
+                        <span style="font-size:14px; color:#6B7280">한국어 (KR)</span>
+                    </div>
+                </div>
+
+                <!-- Data & Info -->
+                <div class="setting-group">
+                    <p class="group-title">데이터 및 정보</p>
+                    <div class="setting-item" id="btnClearSession"
+                        style="justify-content:center; color:#EF4444; font-weight:600; cursor:pointer">
+                        데이터 초기화
+                    </div>
+                    <div class="setting-item" style="border:none">
+                        <div class="setting-label">버전 정보</div>
+                        <span style="font-size:12px; color:#9CA3AF">v0.1</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. New Record (Compose) Overlay -->
+    <div id="composeOverlay" class="settings-overlay hidden" aria-hidden="true"
+        style="z-index:10000; background:white;"> <!-- Full screen white for compose -->
+        <div style="height:100%; display:flex; flex-direction:column;">
+            <div
+                style="padding:10px 20px; height:60px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f3f4f6;">
+                <button id="btnCloseCompose" style="background:transparent; border:none; padding:8px; cursor:pointer;">
+                    <span class="material-icons-outlined" style="font-size:24px; color:#333">close</span>
+                </button>
+                <span id="record-step-indicator" style="font-size:14px; font-weight:600; color:var(--primary)">Step
+                    1/3</span>
+                <div style="width:40px"></div>
+            </div>
+
+            <div id="composeContent" class="scroll-content" style="flex:1; padding:20px;">
+                <!-- Step Content via JS -->
+            </div>
+
+            <div style="padding:20px; border-top:1px solid #f3f4f6;">
+                <button id="btn-record-next" class="btn-capsule" style="width:100%">다음으로</button>
+                <!-- Save button will be injected here or inside content in Step 3 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
