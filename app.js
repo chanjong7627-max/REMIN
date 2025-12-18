@@ -221,11 +221,28 @@ function updateGlobalHeader(screenId) {
     if (showHeaderScreens.includes(screenId)) {
         header.classList.remove('hidden');
         header.style.display = 'flex';
+
         const backBtn = document.getElementById('header-back-btn');
-        if (backBtn) {
-            backBtn.style.visibility = (screenId === 'main') ? 'hidden' : 'visible';
-            backBtn.style.pointerEvents = (screenId === 'main') ? 'none' : 'auto';
+        const logo = document.getElementById('header-logo');
+
+        if (screenId === 'main') {
+            // Show Logo, Hide Back
+            if (backBtn) {
+                backBtn.style.display = 'none';
+            }
+            if (logo) {
+                logo.style.display = 'block';
+            }
+        } else {
+            // Show Back, Hide Logo
+            if (backBtn) {
+                backBtn.style.display = 'block';
+            }
+            if (logo) {
+                logo.style.display = 'none';
+            }
         }
+
     } else {
         header.classList.add('hidden');
         header.style.display = 'none';
@@ -600,81 +617,195 @@ function getTimeAgo(dateString) {
     return `${Math.floor(hour / 24)}d ago`;
 }
 
+// --- Breathing Render ---
 function renderReminerBreathe() {
     return `
         <div class="tab-view-container">
             <h2 class="section-title">호흡 가이드</h2>
             
-            <div class="card-white" style="text-align:center; padding:40px 20px; display:flex; flex-direction:column; align-items:center;">
-                <h3 style="margin-bottom:20px; color:var(--primary)">4-7-8 호흡법</h3>
+            <div class="card-white" style="text-align:center; padding:30px 20px; display:flex; flex-direction:column; align-items:center;">
                 
-                <!-- Breathing Circle -->
-                <div id="breathe-circle" 
-                     style="width:200px; height:200px; border-radius:50%; background:#E0F2FE; 
-                            display:flex; align-items:center; justify-content:center;
-                            position:relative; margin-bottom:30px; transition: all 4s ease-in-out;">
-                    <span id="breathe-status" style="font-size:20px; font-weight:700; color:#0369A1">준비</span>
+                <!-- Session Progress -->
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+                    <span style="font-size:12px; font-weight:600; color:var(--primary)">4-7-8 호흡</span>
+                    <!-- Simple Cycle Count -->
+                    <span id="session-counter" style="font-size:12px; color:#9CA3AF">Cycle ${state.breathing.cycle}/${state.breathing.maxCycles}</span>
+                </div>
+                <div class="session-progress-bar">
+                    <div id="session-bar-fill" class="session-progress-fill" style="width:0%"></div>
                 </div>
 
+                <!-- Timer Circle (Static Size, No Scale Animation) -->
+                <div class="timer-circle" style="transform:none !important; transition:none !important">
+                    <svg class="timer-svg" viewBox="0 0 300 300">
+                        <circle class="timer-circle-bg" cx="150" cy="150" r="140"></circle>
+                        <circle id="timer-progress" class="timer-circle-progress" cx="150" cy="150" r="140"></circle>
+                    </svg>
+                    <div class="timer-text">
+                        <h2 id="timer-number">Ready</h2>
+                        <p id="timer-label" style="font-size:14px; color:#6B7280; margin-top:4px">준비</p>
+                    </div>
+                </div>
+
+                <!-- Phase Chips -->
+                <div class="phase-chips-row">
+                    <div id="chip-inhale" class="phase-chip">Inhale 4s</div>
+                    <div id="chip-hold" class="phase-chip">Hold 7s</div>
+                    <div id="chip-exhale" class="phase-chip">Exhale 8s</div>
+                </div>
+
+                <!-- Controls (IDs only, no inline onclick) -->
                 <div style="display:flex; gap:16px;">
-                    <button class="btn-capsule" style="width:120px" onclick="startBreathingSession()">시작하기</button>
-                    <button class="btn-capsule secondary" style="width:120px" onclick="stopBreathingSession()">멈춤</button>
+                    <button id="btn-breathe-toggle" class="btn-capsule" style="width:140px">시작하기</button>
+                    <button id="btn-breathe-reset" class="btn-capsule secondary" style="width:80px">초기화</button>
                 </div>
                 
-                <p style="margin-top:24px; font-size:14px; color:#6B7280; line-height:1.6">
-                    4초간 들이마시고 (Inhale)<br>
-                    7초간 멈추고 (Hold)<br>
-                    8초간 내뱉으세요 (Exhale)
-                </p>
             </div>
         </div>
     `;
 }
 
-// Breathing Logic
-let breatheInterval;
-window.startBreathingSession = () => {
-    const circle = document.getElementById('breathe-circle');
-    const status = document.getElementById('breathe-status');
-    if (!circle || !status) return;
+// Breathing Logic (RAF based)
+let breatheFrameId;
+const BREATHE_PHASES = [
+    { name: 'Inhale', label: '들이마시기', sec: 4, id: 'chip-inhale' },
+    { name: 'Hold', label: '멈춤', sec: 7, id: 'chip-hold' },
+    { name: 'Exhale', label: '내쉬기', sec: 8, id: 'chip-exhale' }
+];
 
-    status.innerText = "들이마시기 (4초)";
-    circle.style.transform = "scale(1.2)";
-    circle.style.background = "#BAE6FD";
+// Refined Breathing Logic (No Scale, purely State + UI)
+function toggleBreathing() {
+    console.log("[BREATHE] toggleBreathing called. Active:", state.breathing.active, "Paused:", state.breathing.paused);
+    const btn = document.getElementById('btn-breathe-toggle');
 
-    let phase = 0; // 0:Inhale, 1:Hold, 2:Exhale
+    if (state.breathing.active && !state.breathing.paused) {
+        // Pause
+        state.breathing.paused = true;
+        cancelAnimationFrame(breatheFrameId);
+        if (btn) {
+            btn.innerText = "재개하기";
+            btn.style.background = "#9CA3AF";
+        }
+    } else {
+        // Start or Resume
+        if (!state.breathing.active) {
+            console.log("[BREATHE] Starting new session");
+            // Start fresh
+            state.breathing = {
+                active: true, paused: false,
+                phaseIdx: 0,
+                startTime: Date.now(),
+                pausedDuration: 0,
+                cycle: 1, maxCycles: 4,
+                timeLeft: 0
+            };
+        } else {
+            console.log("[BREATHE] Resuming session");
+            // Resume: Fix startTime based on timeLeft
+            state.breathing.paused = false;
+            const p = BREATHE_PHASES[state.breathing.phaseIdx];
+            const elapsedInPhase = (p.sec * 1000) - state.breathing.timeLeft;
+            state.breathing.startTime = Date.now() - elapsedInPhase;
+        }
 
-    if (breatheInterval) clearInterval(breatheInterval);
+        if (btn) {
+            btn.innerText = "일시정지";
+            btn.style.background = "var(--primary)";
+        }
+        tickBreath();
+    }
+}
 
-    // Initial Cycle
-    runCycle(circle, status);
+function resetBreathing() {
+    console.log("[BREATHE] Resetting");
+    cancelAnimationFrame(breatheFrameId);
+    state.breathing = { active: false, paused: false, phaseIdx: 0, timeLeft: 0, totalTime: 0, interval: null, cycle: 0, maxCycles: 4 };
+    renderTabContent();
+}
 
-    breatheInterval = setInterval(() => {
-        runCycle(circle, status);
-    }, 19000); // 4+7+8 = 19s
-};
+function tickBreath() {
+    if (!state.breathing.active || state.breathing.paused) return;
 
-function runCycle(circle, status) {
-    // Inhale
-    status.innerText = "들이마시기 (Inhale)";
-    circle.style.transition = "all 4s ease-in-out";
-    circle.style.transform = "scale(1.2)";
-    circle.style.background = "#7DD3FC";
+    const now = Date.now();
+    const phase = BREATHE_PHASES[state.breathing.phaseIdx];
 
-    setTimeout(() => {
-        // Hold
-        status.innerText = "멈춤 (Hold)";
-        circle.style.transition = "none";
-        circle.style.background = "#38BDF8";
+    if (!phase) {
+        console.error("[BREATHE] Invalid phase index:", state.breathing.phaseIdx);
+        return;
+    }
 
-        setTimeout(() => {
-            // Exhale
-            status.innerText = "내뱉기 (Exhale)";
-            circle.style.transition = "all 8s ease-in-out";
-            circle.style.transform = "scale(1.0)";
-            circle.style.background = "#E0F2FE";
-        }, 7000); // 7s hold
-    }, 4000); // 4s inhale
+    // Calculate elapsed time in this phase
+    const elapsed = now - state.breathing.startTime;
+    const duration = phase.sec * 1000;
+
+    // console.log("[BREATHE] Tick - Phase:", phase.name, "Elapsed:", elapsed, "Duration:", duration);
+
+    if (elapsed >= duration) {
+        // Phase Complete
+        state.breathing.phaseIdx++;
+        console.log("[BREATHE] Phase Complete. New Index:", state.breathing.phaseIdx);
+
+        if (state.breathing.phaseIdx >= BREATHE_PHASES.length) {
+            // Cycle Complete
+            state.breathing.cycle++;
+            state.breathing.phaseIdx = 0;
+            console.log("[BREATHE] Cycle Complete. New Cycle:", state.breathing.cycle);
+
+            if (state.breathing.cycle > state.breathing.maxCycles) {
+                // Session Complete
+                resetBreathing();
+                alert('호흡 세션을 완료했습니다. 참 잘하셨어요!');
+                return;
+            }
+        }
+        // Start Next Phase
+        state.breathing.startTime = now;
+        tickBreath(); // Immediate next tick
+        return;
+    }
+
+    // Update State
+    state.breathing.timeLeft = duration - elapsed;
+    updateBreathUI(phase, elapsed, duration);
+
+    breatheFrameId = requestAnimationFrame(tickBreath);
+}
+
+function updateBreathUI(phase, elapsed, duration) {
+    const ring = document.getElementById('timer-progress');
+    const number = document.getElementById('timer-number');
+    const label = document.getElementById('timer-label');
+    const sessionFill = document.getElementById('session-bar-fill');
+    const sessionCount = document.getElementById('session-counter');
+    const btn = document.getElementById('btn-breathe-main');
+
+    if (!ring || !number) return;
+
+    // Timer Text
+    const remainingSec = Math.ceil((duration - elapsed) / 1000);
+    number.innerText = remainingSec;
+    label.innerText = `${phase.label} (${phase.name})`;
+
+    // Ring Progress (Length ~880)
+    // Inhale: 0 -> 100% (offset 880 -> 0)
+    // Hold: Keep filled or Pulse? User said "Ring 0->100%". 
+    // Exhale: 0 -> 100% or 100% -> 0? User said "0->100%". 
+    // Let's do 0->100 for all as requested.
+    const progress = Math.min(elapsed / duration, 1);
+    const offset = 880 - (880 * progress);
+    ring.style.strokeDashoffset = offset;
+
+    // Session Bar
+    // Approx progress: ((cycle-1)*19 + current_phase_accum + elapsed_sec) / (4*19)
+    // Simplify: Just cycle based (cycle/maxCycles)
+    const cycleProg = ((state.breathing.cycle - 1) / state.breathing.maxCycles) * 100;
+    if (sessionFill) sessionFill.style.width = `${cycleProg}%`;
+    if (sessionCount) sessionCount.innerText = `Cycle ${state.breathing.cycle}/${state.breathing.maxCycles}`;
+
+    // Active Chips
+    document.querySelectorAll('.phase-chip').forEach(c => c.classList.remove('active'));
+    const activeChip = document.getElementById(phase.id);
+    if (activeChip) activeChip.classList.add('active');
 }
 
 window.stopBreathingSession = () => {
@@ -959,6 +1090,24 @@ function renderTabContent() {
     }
 
     container.innerHTML = content;
+
+    // --- Post-Render Logic: Event Binding ---
+    if (m === 'reminer' && t === 'breathe') {
+        const btnToggle = document.getElementById('btn-breathe-toggle');
+        const btnReset = document.getElementById('btn-breathe-reset');
+
+        if (btnToggle) btnToggle.addEventListener('click', toggleBreathing);
+        if (btnReset) btnReset.addEventListener('click', resetBreathing);
+
+        // Restore UI state if running
+        if (state.breathing.active) {
+            const btn = document.getElementById('btn-breathe-toggle');
+            if (btn) {
+                btn.innerText = state.breathing.paused ? "재개하기" : "일시정지";
+                btn.style.background = state.breathing.paused ? "#9CA3AF" : "var(--primary)";
+            }
+        }
+    }
 }
 
 function renderBottomNav() {
@@ -1029,5 +1178,4 @@ window.selectDirection = (mode, el) => {
 window.navigateTo = navigateTo;
 window.handleBack = handleBack;
 window.stopBreathing = () => { navigateTo('main'); };
-window.toggleBreathing = () => { alert('호흡 세션 토글'); };
 

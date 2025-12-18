@@ -36,7 +36,8 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    /* Slight #6DA0E1 gradient as requested (approx 20% opacity at bottom) */
+    background: linear-gradient(180deg, #FFFFFF 0%, rgba(109, 160, 225, 0.25) 100%);
     color: var(--text-primary);
     height: 100dvh;
     overflow: hidden;
@@ -921,7 +922,100 @@ p {
     width: 100%;
 }
 
-/* --- Profile Screen --- */
+/* --- Breathing UI --- */
+.breathing-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+}
+
+.session-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #F3F4F6;
+    border-radius: 3px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.session-progress-fill {
+    height: 100%;
+    background: var(--primary);
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+.timer-circle {
+    position: relative;
+    width: 260px;
+    height: 260px;
+    margin: 40px auto;
+}
+
+.timer-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.timer-circle-bg {
+    fill: none;
+    stroke: #E0F2FE;
+    stroke-width: 12;
+}
+
+.timer-circle-progress {
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 12;
+    stroke-linecap: round;
+    stroke-dasharray: 880;
+    /* 2 * PI * 140 is approx 879.6 */
+    stroke-dashoffset: 880;
+    transition: stroke-dashoffset 0.1s linear;
+}
+
+.timer-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+#timer-number {
+    font-size: 64px;
+    font-weight: 800;
+    color: var(--primary);
+    margin: 0;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.phase-chips-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 30px;
+    margin-bottom: 40px;
+}
+
+.phase-chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: #F9FAFB;
+    color: #9CA3AF;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.phase-chip.active {
+    background: #EFF6FF;
+    color: var(--primary);
+    box-shadow: 0 2px 8px rgba(109, 160, 225, 0.2);
+}
+
 .profile-header-card {
     background: white;
     padding: 30px 20px;
