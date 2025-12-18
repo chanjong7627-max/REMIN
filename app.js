@@ -8,8 +8,49 @@ let state = {
     breathing: { active: false, paused: false, phase: 'idle', timeLeft: 0, totalTime: 0, interval: null, cycle: 0, maxCycles: 4 },
     currentTab: 'home',
     recordDraft: { step: 1, emotions: [], text: "", triggers: [], intensity: 3 },
-    records: []
+    records: [],
+    // Helper Mode State
+    helperLibrary: {
+        currentCategory: 'all',
+        query: ''
+    },
+    helperChat: {
+        messages: [{ from: 'system', text: "안녕하세요, 헬퍼님! 어떤 도움이 필요하신가요?" }]
+    }
 };
+
+const HELPER_SENTENCES = [
+    { cat: '공감', text: "“지금 많이 힘들었겠다. 여기까지 온 것만 해도 충분히 잘한 거야.”" },
+    { cat: '공감', text: "“그 상황이면 그렇게 느끼는 게 너무 자연스러워.”" },
+    { cat: '공감', text: "“네가 예민한 게 아니라, 상황이 버거운 거였을 수도 있어.”" },
+    { cat: '공감', text: "“말로 다 못해도 괜찮아. 그냥 같이 있어줄게.”" },
+    { cat: '공감', text: "“그 감정, 지금은 억지로 없애려 하지 않아도 돼.”" },
+    { cat: '공감', text: "“네가 겪은 걸 가볍게 보지 않을게.”" },
+    { cat: '질문', text: "“지금 제일 크게 드는 감정이 뭐야?”" },
+    { cat: '질문', text: "“그 일이 일어난 뒤에 몸이 어떻게 반응했어? (숨, 심장, 어깨 같은 거)”" },
+    { cat: '질문', text: "“그 순간에 가장 필요했던 건 뭐였을까?”" },
+    { cat: '질문', text: "“혹시 비슷한 상황이 예전에도 있었어?”" },
+    { cat: '질문', text: "“지금 당장 해결보다, ‘덜 힘들게’ 만드는 게 목표라면 뭐부터 해볼 수 있을까?”" },
+    { cat: '질문', text: "“내가 어떻게 도와주면 좋을까? 들어주기/정리해주기/조언 중에.”" },
+    { cat: '정리', text: "“정리하면, (상황) 때문에 (감정) 이 올라온 거네.”" },
+    { cat: '정리', text: "“핵심은 ‘내가 잘못해서’가 아니라 ‘상황이 과부하’였던 것 같아.”" },
+    { cat: '정리', text: "“지금은 (A)를 당장 바꾸기 어렵고, (B)는 지금 할 수 있는 영역 같아.”" },
+    { cat: '정리', text: "“오늘은 해결보다 회복이 우선인 날로 잡아도 될 것 같아.”" },
+    { cat: '정리', text: "“지금 감정이 100이라면, 70만 돼도 숨통 트일 듯해.”" },
+    { cat: '정리', text: "“이 문제는 ‘네가’ 아니라 ‘네가 겪는 환경’ 쪽 이슈가 커 보여.”" },
+    { cat: '격려', text: "“지금 당장 완벽히 처리 못해도 괜찮아. 한 단계만 내려가자.”" },
+    { cat: '격려', text: "“네가 버틴 시간이 그냥 시간이 아니라 ‘힘’이었어.”" },
+    { cat: '격려', text: "“오늘은 작은 행동 하나만 해도 성공이야.”" },
+    { cat: '격려', text: "“지금 멈추는 건 포기가 아니라, 회복을 위한 선택이야.”" },
+    { cat: '격려', text: "“네가 스스로를 지키려는 시도 자체가 이미 방향이 맞아.”" },
+    { cat: '격려', text: "“내가 네 편이라는 건 확실해.”" },
+    { cat: '경계', text: "“그 말은 듣기 힘들었겠다. 그건 정당화될 수 없는 표현이야.”" },
+    { cat: '경계', text: "“지금은 네 감정을 먼저 보호하자. 대화는 잠깐 멈춰도 돼.”" },
+    { cat: '경계', text: "“상대의 감정까지 네가 책임질 필요는 없어.”" },
+    { cat: '경계', text: "“‘지금은 얘기하기 어렵다’고 말해도 충분해.”" },
+    { cat: '경계', text: "“불편한 요청은 거절해도 돼. 거절은 무례가 아니야.”" },
+    { cat: '경계', text: "“이건 네 잘못이 아니라, 상대의 방식 문제일 가능성이 커.”" }
+];
 
 const STORAGE_KEY = 'remin_emotion_logs_v1';
 
@@ -111,6 +152,7 @@ function bindGlobalEvents() {
 
                 // Logic
                 closeOverlay('settingsOverlay');
+                state.currentTab = 'home'; // Reset tab to home on switch
                 window.selectDirection(newMode);
             } else if (newMode === state.mode) {
                 // Already active, just close? or do nothing? 
@@ -336,17 +378,8 @@ window.saveNewRecord = () => {
 
 // --- Tab Rendering (Restored Rich Logic) ---
 
-function renderTabContent() {
-    const container = document.getElementById('tab-content');
-    if (!container) return;
-
-    if (state.currentTab === 'home') container.innerHTML = renderReminerHome();
-    else if (state.currentTab === 'breathe') container.innerHTML = renderReminerBreathe();
-    else if (state.currentTab === 'record') container.innerHTML = renderReminerRecord();
-    else if (state.currentTab === 'insight') container.innerHTML = renderReminerInsight();
-    else if (state.currentTab === 'profile') container.innerHTML = renderProfile();
-    else container.innerHTML = `<h2>${state.currentTab}</h2>`;
-}
+// Old renderTabContent removed. Now specific render functions are below.
+// See renderTabContent definition at the bottom for logic.
 
 function renderReminerHome() {
     console.log("renderHome called");
@@ -655,17 +688,313 @@ window.stopBreathingSession = () => {
     }
 };
 
+// --- Helper Mode Render Functions ---
+
+function renderHelperHome() {
+    return `
+        <div class="tab-view-container">
+            <h2 class="section-title">Helper</h2>
+            <p style="color:var(--text-secondary); margin-bottom:24px">어떤 도움이 필요하신가요?</p>
+            
+            <!-- Search Dummy -->
+            <div style="background:#F3F4F6; border-radius:12px; padding:12px; display:flex; align-items:center; margin-bottom:24px">
+                <span class="material-icons-outlined" style="color:#9CA3AF; margin-right:8px">search</span>
+                <span style="color:#9CA3AF; font-size:14px">궁금한 내용을 검색해보세요</span>
+            </div>
+
+            <div class="card-white" style="margin-bottom:24px; padding:20px 0 0 0; overflow:hidden">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#F3F4F6">
+                    <div style="background:white; padding:20px; text-align:center; cursor:pointer" onclick="window.switchTab('inquiry')">
+                        <span class="material-icons-outlined" style="color:var(--primary); font-size:28px">chat_bubble_outline</span>
+                        <div style="font-size:14px; margin-top:8px; font-weight:600">1:1 문의</div>
+                    </div>
+                     <div style="background:white; padding:20px; text-align:center; cursor:pointer" onclick="window.switchTab('guide')">
+                        <span class="material-icons-outlined" style="color:var(--primary); font-size:28px">help_outline</span>
+                        <div style="font-size:14px; margin-top:8px; font-weight:600">FAQ / 가이드</div>
+                    </div>
+                     <div style="background:white; padding:20px; text-align:center; cursor:pointer" onclick="window.switchTab('example')">
+                        <span class="material-icons-outlined" style="color:var(--primary); font-size:28px">menu_book</span>
+                        <div style="font-size:14px; margin-top:8px; font-weight:600">문장 라이브러리</div>
+                    </div>
+                     <div style="background:white; padding:20px; text-align:center; cursor:pointer" onclick="alert('준비 중입니다')">
+                        <span class="material-icons-outlined" style="color:var(--primary); font-size:28px">lightbulb</span>
+                        <div style="font-size:14px; margin-top:8px; font-weight:600">감정 이해 팁</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="section-title" style="font-size:18px">빠른 해결</h3>
+            <div class="menu-list">
+                 <div class="menu-item" onclick="window.switchTab('guide')"><span class="text">비밀번호를 잊어버렸어요</span><span class="material-icons-outlined arrow">chevron_right</span></div>
+                 <div class="menu-item" onclick="window.switchTab('guide')"><span class="text">알림이 오지 않아요</span><span class="material-icons-outlined arrow">chevron_right</span></div>
+                 <div class="menu-item" onclick="window.switchTab('inquiry')"><span class="text">상담사와 연결하기</span><span class="material-icons-outlined arrow">chevron_right</span></div>
+            </div>
+        </div>
+    `;
+}
+
+function renderHelperExample() {
+    const cats = ['all', '공감', '질문', '정리', '격려', '경계'];
+    const currentCat = state.helperLibrary.currentCategory;
+    const list = HELPER_SENTENCES.filter(s => currentCat === 'all' || s.cat === currentCat);
+
+    // Grouping logic isn't strictly needed if we just filter, but list requirement asks for structure.
+    // Let's render simple card list.
+
+    return `
+        <div class="tab-view-container">
+            <h2 class="section-title">문장 라이브러리</h2>
+            <div class="check-in-container" style="margin-bottom:20px">
+                ${cats.map(c => `
+                    <span class="chip ${currentCat === c ? 'selected' : ''}" 
+                          onclick="window.setHelperCategory('${c}')"
+                          style="margin-right:8px">${c === 'all' ? '전체' : c}</span>
+                `).join('')}
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:12px">
+                ${list.map(item => `
+                    <div class="card-white" style="padding:16px; margin-bottom:0; display:flex; justify-content:space-between; align-items:start">
+                        <div>
+                            <span class="meta-tag" style="margin-bottom:8px">${item.cat}</span>
+                            <p style="font-size:15px; margin-top:4px; line-height:1.5">${item.text}</p>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px">
+                             <button style="border:none; background:none; cursor:pointer; color:#9CA3AF" onclick="window.copyText('${item.text}')">
+                                <span class="material-icons-outlined" style="font-size:20px">content_copy</span>
+                             </button>
+                             <button style="border:none; background:none; cursor:pointer; color:#9CA3AF" onclick="alert('즐겨찾기 추가됨')">
+                                <span class="material-icons-outlined" style="font-size:20px">bookmark_border</span>
+                             </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderHelperInquiry() {
+    const msgs = state.helperChat.messages;
+    return `
+        <div class="tab-view-container" style="display:flex; flex-direction:column; height:calc(100vh - 160px)">
+            <h2 class="section-title" style="flex:none">1:1 문의</h2>
+            
+            <div style="flex:1; overflow-y:auto; padding-bottom:20px; display:flex; flex-direction:column; gap:12px" id="chat-container">
+                 ${msgs.map(m => `
+                    <div style="align-self:${m.from === 'user' ? 'flex-end' : 'flex-start'}; 
+                                background:${m.from === 'user' ? 'var(--primary)' : '#F3F4F6'}; 
+                                color:${m.from === 'user' ? 'white' : 'black'};
+                                padding:10px 16px; border-radius:16px; max-width:80%; font-size:14px; line-height:1.5;
+                                border-bottom-${m.from === 'user' ? 'right' : 'left'}-radius: 4px;">
+                        ${m.text}
+                    </div>
+                 `).join('')}
+            </div>
+
+            <div style="flex:none; padding-top:10px; border-top:1px solid #F3F4F6; background:white">
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." 
+                           style="flex:1; padding:12px; border:1px solid #E5E7EB; border-radius:24px; outline:none"
+                           onkeypress="if(event.key === 'Enter') window.sendHelperMessage()">
+                    <button class="btn-capsule" style="width:auto; padding:0 20px" onclick="window.sendHelperMessage()">
+                        <span class="material-icons-outlined">send</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderHelperGuide() {
+    return `
+        <div class="tab-view-container">
+            <h2 class="section-title">가이드 / FAQ</h2>
+            <div style="margin-bottom:30px">
+                <h3 style="font-size:18px; margin-bottom:12px">자주 묻는 질문</h3>
+                <div class="menu-list">
+                    ${['헬퍼 활동은 어떻게 하나요?', '포인트는 언제 정산되나요?', '부적절한 사용자를 신고하고 싶어요', '리미너 모드와 차이가 뭔가요?', '알림 설정을 변경하고 싶어요', '탈퇴는 어떻게 하나요?'].map((q, i) => `
+                        <div class="menu-item" onclick="window.toggleFaq(${i})">
+                            <div style="flex:1">
+                                <div class="text" style="font-weight:500">${q}</div>
+                                <div id="faq-ans-${i}" style="display:none; margin-top:10px; font-size:13px; color:#6B7280; line-height:1.5">
+                                    이것은 더미 답변입니다. 상세한 내용은 추후 업데이트 됩니다. 헬퍼 가이드를 참고해주세요.
+                                </div>
+                            </div>
+                            <span class="material-icons-outlined arrow" id="faq-icon-${i}">keyboard_arrow_down</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderHelperProfile() {
+    return `
+         <div class="tab-view-container">
+            <h2 class="section-title">프로필 (Helper)</h2>
+            
+            <div class="profile-header-card">
+                 <div class="avatar-circle" style="background:#E0F2FE; color:#0369A1">
+                    <span class="material-icons-outlined">face</span>
+                </div>
+                <h2 style="font-size:20px; font-weight:700; margin-bottom:4px">Helper #1024</h2>
+                <div class="meta-row" style="justify-content:center; margin-top:8px">
+                    <span class="meta-tag highlight">따뜻한 리스너</span>
+                    <span class="meta-tag">공감 랭커</span>
+                </div>
+            </div>
+
+            <div class="card-white" style="margin-top:20px">
+                <h3 style="font-size:16px; margin-bottom:12px">활동 설정</h3>
+                
+                <p style="font-size:13px; color:#6B7280; margin-bottom:8px">주 사용 목적</p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px">
+                    <span class="chip selected">가족/친구 돕기</span>
+                    <span class="chip">연인</span>
+                    <span class="chip">동료</span>
+                </div>
+
+                <p style="font-size:13px; color:#6B7280; margin-bottom:8px">응답 톤</p>
+                <div style="display:flex; gap:10px; background:#F3F4F6; padding:4px; border-radius:12px">
+                    <div style="flex:1; text-align:center; padding:8px; background:white; border-radius:8px; font-size:13px; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,0.05)">따뜻하게</div>
+                    <div style="flex:1; text-align:center; padding:8px; font-size:13px; color:#6B7280">단호하게</div>
+                    <div style="flex:1; text-align:center; padding:8px; font-size:13px; color:#6B7280">조심스럽게</div>
+                </div>
+            </div>
+
+            <button class="btn-capsule secondary" style="margin-top:24px; width:100%" onclick="window.switchToReminerMode()">
+                리미너 모드로 전환
+            </button>
+         </div>
+    `;
+}
+
+
+// --- Helper Logic Helpers ---
+window.setHelperCategory = (c) => {
+    state.helperLibrary.currentCategory = c;
+    renderTabContent();
+};
+
+window.copyText = (text) => {
+    // navigator.clipboard.writeText(text); // Might fail in non-secure context
+    alert('클립보드에 복사되었습니다: ' + text.substring(0, 10) + '...');
+};
+
+window.toggleFaq = (i) => {
+    const ans = document.getElementById(`faq-ans-${i}`);
+    const icon = document.getElementById(`faq-icon-${i}`);
+    if (ans.style.display === 'none') {
+        ans.style.display = 'block';
+        icon.innerText = 'keyboard_arrow_up';
+    } else {
+        ans.style.display = 'none';
+        icon.innerText = 'keyboard_arrow_down';
+    }
+};
+
+window.sendHelperMessage = () => {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    state.helperChat.messages.push({ from: 'user', text: text });
+    input.value = '';
+    renderTabContent(); // Re-render to show message
+
+    setTimeout(() => {
+        state.helperChat.messages.push({ from: 'system', text: "네, 말씀해주셔서 감사합니다. 어떤 부분이 가장 걱정되시나요?" });
+        renderTabContent();
+        // Scroll to bottom
+        const container = document.getElementById('chat-container');
+        if (container) container.scrollTop = container.scrollHeight;
+    }, 1000);
+};
+
+window.switchToReminerMode = () => {
+    if (confirm('리미너 모드로 전환하시겠습니까?')) {
+        state.mode = 'reminer';
+        sessionStorage.setItem('app_mode', 'reminer');
+        state.currentTab = 'home';
+
+        // Update Settings Toggle UI if it exists (not strictly needed as re-render handles, but good for sync)
+        const segMode = document.getElementById('segMode');
+        if (segMode) {
+            // ...
+        }
+
+        renderBottomNav();
+        renderTabContent();
+    }
+};
+
+
+function renderTabContent() {
+    const container = document.getElementById('tab-content');
+    if (!container) return;
+
+    const m = state.mode;
+    const t = state.currentTab;
+
+    console.log("[NAV]", { currentMode: m, targetTab: t });
+
+    let content = "";
+
+    if (m === 'reminer') {
+        if (t === 'home') content = renderReminerHome();
+        else if (t === 'breathe') content = renderReminerBreathe();
+        else if (t === 'record') content = renderReminerRecord();
+        else if (t === 'insight') content = renderReminerInsight();
+        else if (t === 'profile') content = renderProfile();
+        else content = renderReminerHome(); // Default fallback
+    } else if (m === 'helper') {
+        if (t === 'home') content = renderHelperHome();
+        else if (t === 'example') content = renderHelperExample();
+        else if (t === 'inquiry') content = renderHelperInquiry();
+        else if (t === 'guide') content = renderHelperGuide();
+        else if (t === 'profile') content = renderHelperProfile(); // Use distinct helper profile
+        else content = renderHelperHome(); // Default fallback
+    }
+
+    container.innerHTML = content;
+}
+
 function renderBottomNav() {
     const nav = document.querySelector('.bottom-nav');
     if (!nav) return;
-    // Added 'breathe' back to the list
-    nav.innerHTML = ['home', 'breathe', 'record', 'insight', 'profile'].map(t => `
-        <div class="nav-item ${state.currentTab === t ? 'active' : ''}" onclick="window.switchTab('${t}')">
-            <span class="material-icons-outlined">
-                ${t === 'home' ? 'home' : t === 'breathe' ? 'spa' : t === 'record' ? 'edit' : t === 'insight' ? 'insights' : 'person'}
-            </span>
-        </div>
-    `).join('');
+
+    let tabs = [];
+    if (state.mode === 'reminer') {
+        tabs = [
+            { id: 'home', icon: 'home', label: '홈' },
+            { id: 'breathe', icon: 'spa', label: '호흡' },
+            { id: 'record', icon: 'edit', label: '기록' },
+            { id: 'insight', icon: 'insights', label: '인사이트' },
+            { id: 'profile', icon: 'person', label: '프로필' }
+        ];
+    } else { // Helper
+        tabs = [
+            { id: 'home', icon: 'home', label: '홈' },
+            { id: 'example', icon: 'menu_book', label: '예시' },
+            { id: 'inquiry', icon: 'chat_bubble_outline', label: '대화' },
+            { id: 'guide', icon: 'help_outline', label: '가이드' },
+            { id: 'profile', icon: 'person', label: '프로필' }
+        ];
+    }
+
+    nav.innerHTML = '';
+    tabs.forEach(t => {
+        const div = document.createElement('div');
+        div.className = `nav-item ${state.currentTab === t.id ? 'active' : ''}`;
+        div.innerHTML = `<span class="material-icons-outlined">${t.icon}</span>`;
+        div.addEventListener('click', () => {
+            console.log("[HELPER TAB]", { tabName: t.id, currentMode: state.mode, visibleScreen: 'screen-main' });
+            window.switchTab(t.id);
+        });
+        nav.appendChild(div);
+    });
 }
 
 // Global Nav & Direction - adding for navigation safety
@@ -681,6 +1010,9 @@ window.deleteRecord = (id) => {
 window.selectDirection = (mode, el) => {
     state.mode = mode;
     sessionStorage.setItem('app_mode', mode);
+
+    // Force Re-render of Navigation for new mode
+    renderBottomNav();
 
     // Visual feedback
     if (el) {
